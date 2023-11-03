@@ -14,14 +14,11 @@ import (
 func main() {
 	// Logger
 	logger := httplog.NewLogger("httplog-example", httplog.Options{
-		LogLevel: slog.LevelDebug,
-		// JSON:             true,
 		Concise: true,
 		// RequestHeaders:   true,
 		// ResponseHeaders:  true,
 		MessageFieldName: "message",
 		LevelFieldName:   "severity",
-		TimeFieldFormat:  time.RFC3339,
 		Tags: map[string]string{
 			"version": "v1.0-81aa4244d9fc8076a",
 			"env":     "dev",

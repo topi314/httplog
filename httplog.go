@@ -157,7 +157,7 @@ func (l *RequestLoggerEntry) Write(status, bytes int, header http.Header, elapse
 
 func (l *RequestLoggerEntry) Panic(v interface{}, stack []byte) {
 	stacktrace := "#"
-	if l.Options.JSON {
+	if !l.Options.Pretty {
 		stacktrace = string(stack)
 	}
 	l.Logger = *l.Logger.With(
@@ -171,7 +171,7 @@ func (l *RequestLoggerEntry) Panic(v interface{}, stack []byte) {
 
 	l.msg = fmt.Sprintf("%+v", v)
 
-	if !l.Options.JSON {
+	if l.Options.Pretty {
 		middleware.PrintPrettyStack(v)
 	}
 }
@@ -246,7 +246,7 @@ func requestLogFields(r *http.Request, options Options, requestHeaders bool) slo
 }
 
 func headerLogField(header http.Header, options Options) []slog.Attr {
-	headerField := []slog.Attr{}
+	var headerField []slog.Attr
 	for k, v := range header {
 		k = strings.ToLower(k)
 		switch {

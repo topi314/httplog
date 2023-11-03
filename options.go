@@ -1,35 +1,23 @@
 package httplog
 
 import (
-	"io"
-	"os"
+	"log/slog"
 	"strings"
 	"time"
-
-	"log/slog"
 )
 
 var defaultOptions = Options{
-	LogLevel:           slog.LevelInfo,
 	LevelFieldName:     "level",
-	JSON:               false,
 	Concise:            true,
 	Tags:               nil,
 	RequestHeaders:     true,
 	HideRequestHeaders: nil,
 	QuietDownRoutes:    nil,
 	QuietDownPeriod:    0,
-	TimeFieldFormat:    time.RFC3339Nano,
-	TimeFieldName:      "timestamp",
 	MessageFieldName:   "message",
 }
 
 type Options struct {
-	// LogLevel defines the minimum level of severity that app should log.
-	// Must be one of:
-	// slog.LevelDebug, slog.LevelInfo, slog.LevelWarn, slog.LevelError
-	LogLevel slog.Level
-
 	// LevelFieldName sets the field name for the log level or severity.
 	// Some providers parse and search for different field names.
 	LevelFieldName string
@@ -38,12 +26,8 @@ type Options struct {
 	// Default is "msg".
 	MessageFieldName string
 
-	// JSON enables structured logging output in json. Make sure to enable this
-	// in production mode so log aggregators can receive data in parsable format.
-	//
-	// In local development mode, its appropriate to set this value to false to
-	// receive pretty output and stacktraces to stdout.
-	JSON bool
+	// Pretty enables pretty printing of the stacktraces.
+	Pretty bool
 
 	// Concise mode includes fewer log details during the request flow. For example
 	// excluding details like request content length, user-agent and other details.
@@ -74,10 +58,6 @@ type Options struct {
 	// if the route is in QuietDownRoutes
 	QuietDownPeriod time.Duration
 
-	// TimeFieldFormat defines the time format of the Time field, defaulting to "time.RFC3339Nano" see options at:
-	// https://pkg.go.dev/time#pkg-constants
-	TimeFieldFormat string
-
 	// TimeFieldName sets the field name for the time field.
 	// Some providers parse and search for different field names.
 	TimeFieldName string
@@ -86,13 +66,6 @@ type Options struct {
 	// the location in the program source code where the logger was called.
 	// If set to "" then it'll be disabled.
 	SourceFieldName string
-
-	// Writer is the log writer, default is os.Stdout
-	Writer io.Writer
-
-	// ReplaceAttrsOverride allows to add custom logic to replace attributes
-	// in addition to the default logic set in this package.
-	ReplaceAttrsOverride func(groups []string, a slog.Attr) slog.Attr
 }
 
 // Configure will set new options for the httplog instance and behaviour
@@ -103,14 +76,6 @@ func (l *Logger) Configure(opts Options) {
 
 	if opts.LevelFieldName == "" {
 		opts.LevelFieldName = "level"
-	}
-
-	if opts.TimeFieldFormat == "" {
-		opts.TimeFieldFormat = time.RFC3339Nano
-	}
-
-	if opts.TimeFieldName == "" {
-		opts.TimeFieldName = "timestamp"
 	}
 
 	if len(opts.QuietDownRoutes) > 0 {
@@ -125,51 +90,6 @@ func (l *Logger) Configure(opts Options) {
 	}
 
 	l.Options = opts
-
-	var addSource bool
-	if opts.SourceFieldName != "" {
-		addSource = true
-	}
-
-	replaceAttrs := func(groups []string, a slog.Attr) slog.Attr {
-		switch a.Key {
-		case slog.LevelKey:
-			a.Key = opts.LevelFieldName
-		case slog.TimeKey:
-			a.Key = opts.TimeFieldName
-			a.Value = slog.StringValue(a.Value.Time().Format(opts.TimeFieldFormat))
-		case slog.MessageKey:
-			if opts.MessageFieldName != "" {
-				a.Key = opts.MessageFieldName
-			}
-		case slog.SourceKey:
-			if opts.SourceFieldName != "" {
-				a.Key = opts.SourceFieldName
-			}
-		}
-
-		if opts.ReplaceAttrsOverride != nil {
-			return opts.ReplaceAttrsOverride(groups, a)
-		}
-		return a
-	}
-
-	handlerOpts := &slog.HandlerOptions{
-		Level:       opts.LogLevel,
-		ReplaceAttr: replaceAttrs,
-		AddSource:   addSource,
-	}
-
-	writer := opts.Writer
-	if writer == nil {
-		writer = os.Stdout
-	}
-
-	if !opts.JSON {
-		slog.SetDefault(slog.New(NewPrettyHandler(writer, handlerOpts)))
-	} else {
-		slog.SetDefault(slog.New(slog.NewJSONHandler(writer, handlerOpts)))
-	}
 }
 
 func LevelByName(name string) slog.Level {
